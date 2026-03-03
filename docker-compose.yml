@@ -1,0 +1,20 @@
+services:
+  mcp-server:
+    build: .
+    ports:
+      - "${ADDR:-8080}:8080"
+    environment:
+      - TRANSPORT=sse
+      - ADDR=:8080
+      - BASE_PATH=/mcp
+      - BASE_URL=${BASE_URL:-}
+      - PERPTOOLS_BASE_URL=${PERPTOOLS_BASE_URL}
+      - BROKER_ID=${BROKER_ID}
+      - ORDERLY_BASE_URL=${ORDERLY_BASE_URL:-https://api.orderly.org}
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:8080/mcp/sse"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
