@@ -16,7 +16,7 @@ import (
 func main() {
 	svc := service.NewService(service.Config{
 		OrderlyBaseURL:   "https://api.orderly.org",
-		PerptoolsBaseURL: "https://api.perptools.com",
+		PerptoolsBaseURL: "https://app.perptools.ai/api",
 		BrokerID:         "dextools",
 	})
 
