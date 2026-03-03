@@ -15,9 +15,9 @@ import (
 
 func main() {
 	svc := service.NewService(service.Config{
-		OrderlyBaseURL:   envOrDefault("ORDERLY_BASE_URL", "https://api.orderly.org"),
-		PerptoolsBaseURL: mustEnv("PERPTOOLS_BASE_URL"),
-		BrokerID:         mustEnv("BROKER_ID"),
+		OrderlyBaseURL:   "https://api.orderly.org",
+		PerptoolsBaseURL: "https://api.perptools.com",
+		BrokerID:         "dextools",
 	})
 
 	s := server.NewMCPServer(
@@ -64,15 +64,6 @@ func main() {
 	default:
 		log.Fatalf("Unknown transport: %s (supported: sse, stdio)", transport)
 	}
-}
-
-func mustEnv(key string) string {
-	v := os.Getenv(key)
-	if v == "" {
-		fmt.Fprintf(os.Stderr, "required env var %s is not set\n", key)
-		os.Exit(1)
-	}
-	return v
 }
 
 func envOrDefault(key, def string) string {

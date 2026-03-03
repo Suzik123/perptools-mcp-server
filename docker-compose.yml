@@ -1,16 +1,9 @@
 services:
   mcp-server:
     build: .
+    env_file: .env
     ports:
-      - "${ADDR:-8080}:8080"
-    environment:
-      - TRANSPORT=sse
-      - ADDR=:8080
-      - BASE_PATH=/mcp
-      - BASE_URL=${BASE_URL:-}
-      - PERPTOOLS_BASE_URL=${PERPTOOLS_BASE_URL}
-      - BROKER_ID=${BROKER_ID}
-      - ORDERLY_BASE_URL=${ORDERLY_BASE_URL:-https://api.orderly.org}
+      - "8080:8080"
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "wget", "--spider", "-q", "http://localhost:8080/mcp/sse"]
