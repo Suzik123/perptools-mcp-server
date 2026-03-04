@@ -70,6 +70,9 @@ func (s *Service) PrepareRegistration(ctx context.Context, walletAddress string)
 }
 
 func (s *Service) CompleteRegistration(ctx context.Context, walletAddress, signature string) (string, error) {
+	if creds := s.auth.GetCredentials(); creds != nil && creds.AccountID != "" {
+		return creds.AccountID, nil
+	}
 	if err := s.auth.CompleteRegistration(ctx, walletAddress, signature); err != nil {
 		return "", err
 	}
@@ -236,8 +239,12 @@ func (s *Service) PrepareOrderlyWithdraw(ctx context.Context, walletAddress, tok
 }
 
 func (s *Service) requireAuth() error {
-	if !s.auth.IsAuthenticated() {
-		return fmt.Errorf("not authenticated — run prepare_registration, complete_registration, prepare_orderly_key, complete_orderly_key first")
+	if s.auth.IsAuthenticated() {
+		return nil
 	}
-	return nil
+	creds := s.auth.GetCredentials()
+	if creds == nil || creds.AccountID == "" {
+		return fmt.Errorf("not authenticated — start by calling prepare_registration with your wallet_address")
+	}
+	return fmt.Errorf("account registered (account_id: %s) but orderly key not set — call prepare_orderly_key, then complete_orderly_key", creds.AccountID)
 }

@@ -23,9 +23,11 @@ type Credentials struct {
 }
 
 type PrepareResult struct {
-	MessageBase64 string
-	WalletAddress string
-	DebugHash     string
+	MessageBase64     string
+	WalletAddress     string
+	DebugHash         string
+	AlreadyRegistered bool
+	AccountID         string
 }
 
 type Config struct {
@@ -56,8 +58,22 @@ func (s *Service) GetCredentials() *Credentials {
 	return s.credentials
 }
 
-// Step 1: build registration message, return base64-encoded bytes for wallet to sign.
+// Step 1: check if account already exists; if not, build registration message
+// for wallet signing.
 func (s *Service) PrepareRegistration(ctx context.Context, walletAddress string) (*PrepareResult, error) {
+	existing, err := s.client.GetAccount(ctx, walletAddress, s.cfg.BrokerID)
+	if err == nil && existing.Success && existing.Data.AccountID != "" {
+		s.credentials = &Credentials{
+			AccountID:     existing.Data.AccountID,
+			WalletAddress: walletAddress,
+		}
+		return &PrepareResult{
+			WalletAddress:     walletAddress,
+			AlreadyRegistered: true,
+			AccountID:         existing.Data.AccountID,
+		}, nil
+	}
+
 	nonceResp, err := s.client.GetNonce(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("get nonce: %w", err)

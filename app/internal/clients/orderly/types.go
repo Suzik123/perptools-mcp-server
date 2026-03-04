@@ -75,6 +75,21 @@ type AddOrderlyKeyResponse struct {
 }
 
 // ---------------------------------------------------------------------------
+// Get Account — GET /v1/get_account
+// https://orderly.network/docs/build-on-omnichain/evm-api/restful-api/public/check-if-wallet-is-registered
+// ---------------------------------------------------------------------------
+
+type GetAccountResponse struct {
+	Success   bool   `json:"success"`
+	Timestamp int64  `json:"timestamp"`
+	Message   string `json:"message,omitempty"`
+	Data      struct {
+		UserID    int    `json:"user_id"`
+		AccountID string `json:"account_id"`
+	} `json:"data"`
+}
+
+// ---------------------------------------------------------------------------
 // Withdraw Message — used to build a keccak256 hash for wallet signing
 // ---------------------------------------------------------------------------
 

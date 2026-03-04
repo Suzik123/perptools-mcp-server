@@ -58,10 +58,21 @@ func prepareRegistration(svc *service.Service) server.ToolHandlerFunc {
 			return mcp.NewToolResultError(fmt.Sprintf("prepare registration failed: %v", err)), nil
 		}
 
+		if result.AlreadyRegistered {
+			out, _ := json.Marshal(map[string]any{
+				"already_registered": true,
+				"account_id":        result.AccountID,
+				"wallet_address":    result.WalletAddress,
+				"next_step":         "Account already registered. Skip complete_registration and proceed directly to prepare_orderly_key.",
+			})
+			return mcp.NewToolResultText(string(out)), nil
+		}
+
 		out, _ := json.Marshal(map[string]string{
 			"message_base64": result.MessageBase64,
 			"wallet_address": result.WalletAddress,
 			"debug_hash":     result.DebugHash,
+			"next_step":      "Sign the message_base64 with the wallet (via Phantom MCP) and call complete_registration with the signature.",
 		})
 		return mcp.NewToolResultText(string(out)), nil
 	}

@@ -9,6 +9,10 @@ import (
 )
 
 type Client interface {
+	// GetAccount checks whether a wallet is registered with the given broker.
+	// https://orderly.network/docs/build-on-omnichain/evm-api/restful-api/public/check-if-wallet-is-registered
+	GetAccount(ctx context.Context, address, brokerID string) (*GetAccountResponse, error)
+
 	// GetNonce fetches a registration nonce required for account registration.
 	GetNonce(ctx context.Context) (*GetNonceResponse, error)
 
@@ -41,6 +45,23 @@ func NewClient(cfg Config) Client {
 	}
 
 	return &client{http: c}
+}
+
+func (c *client) GetAccount(ctx context.Context, address, brokerID string) (*GetAccountResponse, error) {
+	var out GetAccountResponse
+	r, err := c.http.R().SetContext(ctx).
+		SetQueryParam("address", address).
+		SetQueryParam("broker_id", brokerID).
+		SetQueryParam("chain_type", "SOL").
+		SetResult(&out).
+		Get("/v1/get_account")
+	if err != nil {
+		return nil, fmt.Errorf("get account: %w", err)
+	}
+	if r.IsError() {
+		return nil, fmt.Errorf("get account: %s %s", r.Status(), r.String())
+	}
+	return &out, nil
 }
 
 func (c *client) GetNonce(ctx context.Context) (*GetNonceResponse, error) {
