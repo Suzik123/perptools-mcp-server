@@ -73,3 +73,18 @@ type AddOrderlyKeyResponse struct {
 		OrderlyKey string `json:"orderly_key"`
 	} `json:"data"`
 }
+
+// ---------------------------------------------------------------------------
+// Withdraw Message — used to build a keccak256 hash for wallet signing
+// ---------------------------------------------------------------------------
+
+type WithdrawMessage struct {
+	BrokerID      string `json:"broker_id"`
+	ChainID       uint64 `json:"chainId"`
+	Receiver      string `json:"receiver"`
+	Token         string `json:"token"`
+	Amount        uint64 `json:"amount"`
+	WithdrawNonce uint64 `json:"withdrawNonce"`
+	Timestamp     uint64 `json:"timestamp"`
+	ChainType     string `json:"chainType"`
+}

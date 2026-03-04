@@ -2,17 +2,23 @@ package service
 
 import (
 	"context"
+	"encoding/base64"
 	"fmt"
+	"time"
 
 	"mcp-server/app/internal/clients/orderly"
 	"mcp-server/app/internal/clients/perptools"
 	"mcp-server/app/internal/service/auth"
+
+	"github.com/gagliardetto/solana-go"
+	"github.com/gagliardetto/solana-go/rpc"
 )
 
 type Config struct {
 	PerptoolsBaseURL string
 	OrderlyBaseURL   string
 	BrokerID         string
+	SolanaRPCURL     string
 }
 
 type Service struct {
@@ -20,6 +26,7 @@ type Service struct {
 	auth      *auth.Service
 	orderly   orderly.Client
 	perptools perptools.Client
+	solanaRPC *rpc.Client
 }
 
 func NewService(cfg Config) *Service {
@@ -32,6 +39,11 @@ func NewService(cfg Config) *Service {
 		orderly: orderlyClient,
 	}
 	s.perptools = perptools.NewClient(cfg.PerptoolsBaseURL)
+
+	if cfg.SolanaRPCURL != "" {
+		s.solanaRPC = rpc.New(cfg.SolanaRPCURL)
+	}
+
 	return s
 }
 
@@ -118,6 +130,102 @@ func (s *Service) LendingWithdraw(ctx context.Context, req perptools.LendingTxRe
 		return nil, err
 	}
 	return s.perptools.LendingWithdraw(ctx, req)
+}
+
+// --- Orderly Vault (deposit / withdraw) ---
+
+type DepositResult struct {
+	TransactionBase64 string `json:"transaction_base64"`
+	WalletAddress     string `json:"wallet_address"`
+	Symbol            string `json:"symbol"`
+	Amount            uint64 `json:"amount"`
+}
+
+type WithdrawResult struct {
+	TransactionBase64 string `json:"transaction_base64"`
+	WalletAddress     string `json:"wallet_address"`
+	Token             string `json:"token"`
+	DebugHash         string `json:"debug_hash"`
+}
+
+func (s *Service) PrepareOrderlyDeposit(ctx context.Context, walletAddress, symbol string, amount, nativeFee uint64) (*DepositResult, error) {
+	if s.solanaRPC == nil {
+		return nil, fmt.Errorf("solana RPC not configured — set SOLANA_RPC_URL")
+	}
+
+	userKey, err := solana.PublicKeyFromBase58(walletAddress)
+	if err != nil {
+		return nil, fmt.Errorf("invalid wallet address: %w", err)
+	}
+
+	recent, err := s.solanaRPC.GetLatestBlockhash(ctx, rpc.CommitmentFinalized)
+	if err != nil {
+		return nil, fmt.Errorf("get blockhash: %w", err)
+	}
+
+	tx, err := orderly.Deposit(
+		s.cfg.BrokerID,
+		symbol,
+		userKey,
+		amount,
+		orderly.OAppSendParams{NativeFee: nativeFee, LzTokenFee: 0},
+		recent.Value.Blockhash,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("build deposit tx: %w", err)
+	}
+
+	txBase64, err := tx.ToBase64()
+	if err != nil {
+		return nil, fmt.Errorf("serialize tx: %w", err)
+	}
+
+	return &DepositResult{
+		TransactionBase64: txBase64,
+		WalletAddress:     walletAddress,
+		Symbol:            symbol,
+		Amount:            amount,
+	}, nil
+}
+
+func (s *Service) PrepareOrderlyWithdraw(ctx context.Context, walletAddress, token string, amount, withdrawNonce uint64) (*WithdrawResult, error) {
+	userKey, err := solana.PublicKeyFromBase58(walletAddress)
+	if err != nil {
+		return nil, fmt.Errorf("invalid wallet address: %w", err)
+	}
+
+	withdrawMsg := orderly.WithdrawMessage{
+		BrokerID:      s.cfg.BrokerID,
+		ChainID:       900900900,
+		Receiver:      walletAddress,
+		Token:         token,
+		Amount:        amount,
+		WithdrawNonce: withdrawNonce,
+		Timestamp:     uint64(time.Now().UTC().UnixMilli()),
+		ChainType:     "SOL",
+	}
+
+	signMessage, err := orderly.CreateWithdrawMessage(withdrawMsg)
+	if err != nil {
+		return nil, fmt.Errorf("create withdraw message: %w", err)
+	}
+
+	tx, err := orderly.PackMessageForSolana(userKey, signMessage)
+	if err != nil {
+		return nil, fmt.Errorf("pack message for solana: %w", err)
+	}
+
+	txBytes, err := tx.MarshalBinary()
+	if err != nil {
+		return nil, fmt.Errorf("serialize tx: %w", err)
+	}
+
+	return &WithdrawResult{
+		TransactionBase64: base64.StdEncoding.EncodeToString(txBytes),
+		WalletAddress:     walletAddress,
+		Token:             token,
+		DebugHash:         string(signMessage),
+	}, nil
 }
 
 func (s *Service) requireAuth() error {

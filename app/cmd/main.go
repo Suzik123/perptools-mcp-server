@@ -18,6 +18,7 @@ func main() {
 		OrderlyBaseURL:   "https://api.orderly.org",
 		PerptoolsBaseURL: "https://app.perptools.ai/api",
 		BrokerID:         "dextools",
+		SolanaRPCURL:     envOrDefault("SOLANA_RPC_URL", "https://api.mainnet-beta.solana.com"),
 	})
 
 	s := server.NewMCPServer(
@@ -30,6 +31,9 @@ func main() {
 		s.AddTool(t.Tool, t.Handler)
 	}
 	for _, t := range tools.RegisterPerptoolsTools(svc) {
+		s.AddTool(t.Tool, t.Handler)
+	}
+	for _, t := range tools.RegisterOrderlyTools(svc) {
 		s.AddTool(t.Tool, t.Handler)
 	}
 
