@@ -15,11 +15,10 @@ func RegisterOrderlyTools(svc *service.Service) []ToolDef {
 	return []ToolDef{
 		{
 			Tool: mcp.NewTool("prepare_orderly_deposit",
-				mcp.WithDescription("Build an unsigned Solana transaction that deposits tokens into the Orderly vault via LayerZero. Returns base64-encoded transaction for wallet signing."),
+				mcp.WithDescription("Build an unsigned Solana transaction that deposits tokens into the Orderly vault via LayerZero. The LayerZero cross-chain fee is fetched automatically via oappQuote simulation. Returns base64-encoded transaction for wallet signing."),
 				mcp.WithString("wallet_address", mcp.Required(), mcp.Description("Solana wallet public key (base58)")),
 				mcp.WithString("symbol", mcp.Required(), mcp.Description("Token symbol: USDC, USDT, or SOL")),
 				mcp.WithNumber("amount", mcp.Required(), mcp.Description("Amount in smallest token units (e.g. lamports for SOL, 1e6 units for USDC)")),
-				mcp.WithNumber("native_fee", mcp.Required(), mcp.Description("LayerZero native fee in lamports (cross-chain messaging fee)")),
 			),
 			Handler: prepareOrderlyDeposit(svc),
 		},
@@ -50,9 +49,8 @@ func prepareOrderlyDeposit(svc *service.Service) server.ToolHandlerFunc {
 		if amount == 0 {
 			return mcp.NewToolResultError("amount is required and must be > 0"), nil
 		}
-		nativeFee := uint64(optNumber(req, "native_fee", 0))
 
-		result, err := svc.PrepareOrderlyDeposit(ctx, wallet, symbol, amount, nativeFee)
+		result, err := svc.PrepareOrderlyDeposit(ctx, wallet, symbol, amount)
 		if err != nil {
 			return mcp.NewToolResultError(fmt.Sprintf("prepare deposit failed: %v", err)), nil
 		}

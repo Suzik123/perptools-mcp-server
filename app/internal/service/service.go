@@ -139,6 +139,7 @@ type DepositResult struct {
 	WalletAddress     string `json:"wallet_address"`
 	Symbol            string `json:"symbol"`
 	Amount            uint64 `json:"amount"`
+	NativeFee         uint64 `json:"native_fee"`
 }
 
 type WithdrawResult struct {
@@ -148,7 +149,7 @@ type WithdrawResult struct {
 	DebugHash         string `json:"debug_hash"`
 }
 
-func (s *Service) PrepareOrderlyDeposit(ctx context.Context, walletAddress, symbol string, amount, nativeFee uint64) (*DepositResult, error) {
+func (s *Service) PrepareOrderlyDeposit(ctx context.Context, walletAddress, symbol string, amount uint64) (*DepositResult, error) {
 	if s.solanaRPC == nil {
 		return nil, fmt.Errorf("solana RPC not configured — set SOLANA_RPC_URL")
 	}
@@ -156,6 +157,11 @@ func (s *Service) PrepareOrderlyDeposit(ctx context.Context, walletAddress, symb
 	userKey, err := solana.PublicKeyFromBase58(walletAddress)
 	if err != nil {
 		return nil, fmt.Errorf("invalid wallet address: %w", err)
+	}
+
+	nativeFee, err := orderly.GetDepositQuoteFee(ctx, s.solanaRPC, s.cfg.BrokerID, symbol, userKey, amount)
+	if err != nil {
+		return nil, fmt.Errorf("get deposit quote fee: %w", err)
 	}
 
 	recent, err := s.solanaRPC.GetLatestBlockhash(ctx, rpc.CommitmentFinalized)
@@ -185,6 +191,7 @@ func (s *Service) PrepareOrderlyDeposit(ctx context.Context, walletAddress, symb
 		WalletAddress:     walletAddress,
 		Symbol:            symbol,
 		Amount:            amount,
+		NativeFee:         nativeFee,
 	}, nil
 }
 
