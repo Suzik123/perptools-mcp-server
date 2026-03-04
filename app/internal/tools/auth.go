@@ -2,7 +2,7 @@ package tools
 
 import (
 	"context"
-	"encoding/hex"
+	"encoding/json"
 	"fmt"
 
 	"mcp-server/app/internal/service"
@@ -15,7 +15,7 @@ func RegisterAuthTools(svc *service.Service) []ToolDef {
 	return []ToolDef{
 		{
 			Tool: mcp.NewTool("prepare_registration",
-				mcp.WithDescription("Prepare Orderly account registration. Returns hex-encoded message bytes that must be signed by the wallet (via Phantom MCP)."),
+				mcp.WithDescription("Prepare Orderly account registration. Returns base64-encoded message that must be signed by the wallet (via Phantom MCP), the wallet address, and a debug hash."),
 				mcp.WithString("wallet_address", mcp.Required(), mcp.Description("Solana wallet public key (base58)")),
 			),
 			Handler: prepareRegistration(svc),
@@ -30,7 +30,7 @@ func RegisterAuthTools(svc *service.Service) []ToolDef {
 		},
 		{
 			Tool: mcp.NewTool("prepare_orderly_key",
-				mcp.WithDescription("Generate a random ed25519 Orderly key and prepare the registration message. Returns hex-encoded message bytes that must be signed by the wallet (via Phantom MCP)."),
+				mcp.WithDescription("Generate a random ed25519 Orderly key and prepare the registration message. Returns base64-encoded message that must be signed by the wallet (via Phantom MCP), the wallet address, and a debug hash."),
 				mcp.WithString("wallet_address", mcp.Required(), mcp.Description("Solana wallet public key (base58)")),
 			),
 			Handler: prepareOrderlyKey(svc),
@@ -53,12 +53,17 @@ func prepareRegistration(svc *service.Service) server.ToolHandlerFunc {
 			return mcp.NewToolResultError(err.Error()), nil
 		}
 
-		msgBytes, err := svc.PrepareRegistration(ctx, wallet)
+		result, err := svc.PrepareRegistration(ctx, wallet)
 		if err != nil {
 			return mcp.NewToolResultError(fmt.Sprintf("prepare registration failed: %v", err)), nil
 		}
 
-		return mcp.NewToolResultText(fmt.Sprintf("Sign these bytes with your wallet via Phantom MCP:\n%s", hex.EncodeToString(msgBytes))), nil
+		out, _ := json.Marshal(map[string]string{
+			"message_base64": result.MessageBase64,
+			"wallet_address": result.WalletAddress,
+			"debug_hash":     result.DebugHash,
+		})
+		return mcp.NewToolResultText(string(out)), nil
 	}
 }
 
@@ -89,12 +94,17 @@ func prepareOrderlyKey(svc *service.Service) server.ToolHandlerFunc {
 			return mcp.NewToolResultError(err.Error()), nil
 		}
 
-		msgBytes, err := svc.PrepareOrderlyKey(ctx, wallet)
+		result, err := svc.PrepareOrderlyKey(ctx, wallet)
 		if err != nil {
 			return mcp.NewToolResultError(fmt.Sprintf("prepare orderly key failed: %v", err)), nil
 		}
 
-		return mcp.NewToolResultText(fmt.Sprintf("Sign these bytes with your wallet via Phantom MCP:\n%s", hex.EncodeToString(msgBytes))), nil
+		out, _ := json.Marshal(map[string]string{
+			"message_base64": result.MessageBase64,
+			"wallet_address": result.WalletAddress,
+			"debug_hash":     result.DebugHash,
+		})
+		return mcp.NewToolResultText(string(out)), nil
 	}
 }
 

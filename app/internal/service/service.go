@@ -53,7 +53,7 @@ func (s *Service) IsAuthenticated() bool {
 	return s.auth.IsAuthenticated()
 }
 
-func (s *Service) PrepareRegistration(ctx context.Context, walletAddress string) ([]byte, error) {
+func (s *Service) PrepareRegistration(ctx context.Context, walletAddress string) (*auth.PrepareResult, error) {
 	return s.auth.PrepareRegistration(ctx, walletAddress)
 }
 
@@ -64,7 +64,7 @@ func (s *Service) CompleteRegistration(ctx context.Context, walletAddress, signa
 	return s.auth.GetCredentials().AccountID, nil
 }
 
-func (s *Service) PrepareOrderlyKey(ctx context.Context, walletAddress string) ([]byte, error) {
+func (s *Service) PrepareOrderlyKey(ctx context.Context, walletAddress string) (*auth.PrepareResult, error) {
 	return s.auth.PrepareOrderlyKey(ctx, walletAddress)
 }
 

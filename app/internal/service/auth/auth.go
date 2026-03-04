@@ -3,6 +3,7 @@ package auth
 import (
 	"context"
 	"crypto/ed25519"
+	"encoding/base64"
 	"fmt"
 	"strconv"
 	"time"
@@ -19,6 +20,12 @@ type Credentials struct {
 	WalletAddress     string
 	OrderlyPublicKey  string
 	OrderlyPrivateKey ed25519.PrivateKey
+}
+
+type PrepareResult struct {
+	MessageBase64 string
+	WalletAddress string
+	DebugHash     string
 }
 
 type Config struct {
@@ -49,8 +56,8 @@ func (s *Service) GetCredentials() *Credentials {
 	return s.credentials
 }
 
-// Step 1: build registration message, return bytes for wallet to sign.
-func (s *Service) PrepareRegistration(ctx context.Context, walletAddress string) ([]byte, error) {
+// Step 1: build registration message, return base64-encoded bytes for wallet to sign.
+func (s *Service) PrepareRegistration(ctx context.Context, walletAddress string) (*PrepareResult, error) {
 	nonceResp, err := s.client.GetNonce(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("get nonce: %w", err)
@@ -71,7 +78,11 @@ func (s *Service) PrepareRegistration(ctx context.Context, walletAddress string)
 	}
 
 	s.pendingRegMsg = &msg
-	return signBytes, nil
+	return &PrepareResult{
+		MessageBase64: base64.StdEncoding.EncodeToString(signBytes),
+		WalletAddress: walletAddress,
+		DebugHash:     string(signBytes),
+	}, nil
 }
 
 // Step 2: submit wallet signature to Orderly.
@@ -100,8 +111,8 @@ func (s *Service) CompleteRegistration(ctx context.Context, walletAddress, signa
 	return nil
 }
 
-// Step 3: generate random ed25519 keypair, build key message, return bytes for wallet to sign.
-func (s *Service) PrepareOrderlyKey(ctx context.Context, walletAddress string) ([]byte, error) {
+// Step 3: generate random ed25519 keypair, build key message, return base64-encoded bytes for wallet to sign.
+func (s *Service) PrepareOrderlyKey(ctx context.Context, walletAddress string) (*PrepareResult, error) {
 	pub, priv, err := ed25519.GenerateKey(nil)
 	if err != nil {
 		return nil, fmt.Errorf("generate ed25519 keypair: %w", err)
@@ -126,7 +137,11 @@ func (s *Service) PrepareOrderlyKey(ctx context.Context, walletAddress string) (
 	s.pendingKeyMsg = &msg
 	s.pendingKeyPub = pub
 	s.pendingKeyPrv = priv
-	return signBytes, nil
+	return &PrepareResult{
+		MessageBase64: base64.StdEncoding.EncodeToString(signBytes),
+		WalletAddress: walletAddress,
+		DebugHash:     string(signBytes),
+	}, nil
 }
 
 // Step 4: submit wallet signature to Orderly, store credentials in memory.
