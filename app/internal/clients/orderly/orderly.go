@@ -191,13 +191,21 @@ func (c *privateClient) CreateOrder(ctx context.Context, req CreateOrderRequest)
 	if err != nil {
 		return nil, fmt.Errorf("create order: %w", err)
 	}
-	if r.IsError() {
-		return nil, fmt.Errorf("create order: %s %s", r.Status(), r.String())
-	}
-	if !out.Success {
-		return nil, fmt.Errorf("create order: %s", out.Message)
+	if r.IsError() || !out.Success {
+		return nil, parseAPIError(r.Body(), "create order")
 	}
 	return &out, nil
+}
+
+func parseAPIError(body []byte, op string) error {
+	var resp struct {
+		Code    int    `json:"code"`
+		Message string `json:"message"`
+	}
+	if err := json.Unmarshal(body, &resp); err == nil && resp.Message != "" {
+		return &APIError{Code: resp.Code, Message: resp.Message}
+	}
+	return fmt.Errorf("%s: %s", op, string(body))
 }
 
 func (c *privateClient) CancelOrder(ctx context.Context, symbol string, orderID int) (*CancelOrderResponse, error) {

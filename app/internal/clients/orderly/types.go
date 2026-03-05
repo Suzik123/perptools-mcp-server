@@ -1,5 +1,28 @@
 package orderly
 
+import (
+	"encoding/json"
+	"fmt"
+)
+
+// APIError represents a structured error from Orderly API.
+type APIError struct {
+	Code    int    `json:"code"`
+	Message string `json:"message"`
+}
+
+func (e *APIError) Error() string {
+	return fmt.Sprintf("[%d] %s", e.Code, e.Message)
+}
+
+// IsAPIError checks if err is an *APIError and returns it.
+func IsAPIError(err error) (*APIError, bool) {
+	if e, ok := err.(*APIError); ok {
+		return e, true
+	}
+	return nil, false
+}
+
 // ---------------------------------------------------------------------------
 // Get Nonce — GET /v1/registration_nonce
 // ---------------------------------------------------------------------------
@@ -98,12 +121,10 @@ type CreateOrderRequest struct {
 	Symbol          string  `json:"symbol"`
 	ClientOrderID   string  `json:"client_order_id,omitempty"`
 	OrderType       string  `json:"order_type"`
-	OrderPrice      float64 `json:"order_price,omitempty"`
-	OrderQuantity   float64 `json:"order_quantity,omitempty"`
-	OrderAmount     float64 `json:"order_amount,omitempty"`
-	VisibleQuantity float64 `json:"visible_quantity,omitempty"`
-	Side            string  `json:"side"`
-	ReduceOnly      bool    `json:"reduce_only,omitempty"`
+	OrderPrice    float64 `json:"order_price,omitempty"`
+	OrderQuantity float64 `json:"order_quantity,omitempty"`
+	Side          string  `json:"side"`
+	ReduceOnly    bool    `json:"reduce_only,omitempty"`
 }
 
 type CreateOrderResponse struct {
@@ -156,16 +177,16 @@ type PositionsResponse struct {
 }
 
 type Position struct {
-	Symbol           string  `json:"symbol"`
-	PositionQty      float64 `json:"position_qty"`
-	AverageOpenPrice float64 `json:"average_open_price"`
-	MarkPrice        float64 `json:"mark_price"`
-	UnsettledPnl     float64 `json:"unsettled_pnl"`
-	EstLiqPrice      float64 `json:"est_liq_price"`
-	IMR              float64 `json:"imr"`
-	MMR              float64 `json:"mmr"`
-	Leverage         float64 `json:"leverage"`
-	Timestamp        int64   `json:"timestamp"`
+	Symbol           string      `json:"symbol"`
+	PositionQty      float64     `json:"position_qty"`
+	AverageOpenPrice float64     `json:"average_open_price"`
+	MarkPrice        float64     `json:"mark_price"`
+	UnsettledPnl     float64     `json:"unsettled_pnl"`
+	EstLiqPrice      json.Number `json:"est_liq_price"`
+	IMR              json.Number `json:"imr"`
+	MMR              json.Number `json:"mmr"`
+	Leverage         json.Number `json:"leverage"`
+	Timestamp        int64       `json:"timestamp"`
 }
 
 // ---------------------------------------------------------------------------

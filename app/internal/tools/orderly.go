@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strings"
 
 	"mcp-server/app/internal/clients/orderly"
 	"mcp-server/app/internal/service"
@@ -35,13 +36,37 @@ func RegisterOrderlyTools(svc *service.Service) []ToolDef {
 		},
 		{
 			Tool: mcp.NewTool("create_order",
-				mcp.WithDescription("Place a new order on Orderly. Requires authentication.\n\nOrder types: LIMIT, MARKET, IOC, FOK, POST_ONLY, ASK, BID.\nSides: BUY, SELL.\n\nTo close an existing position, create an order with the opposite side and set reduce_only=true.\nFor example, to close a long position of 0.5 BTC, place a MARKET SELL order with order_quantity=0.5 and reduce_only=true."),
+				mcp.WithDescription(`Place a new order on Orderly. Requires authentication.
+
+IMPORTANT: All PERP markets use order_quantity in BASE currency (ETH, BTC, etc.), NOT in USDC.
+If the user says "buy $100 of ETH", you must convert: order_quantity = desired_usdc / current_price.
+Use get_markets to look up the current mark_price for the symbol.
+
+Order types:
+  MARKET  — executes immediately at best available price. Only needs: symbol, side, order_quantity.
+  LIMIT   — executes at order_price or better. Needs: symbol, side, order_quantity, order_price.
+  POST_ONLY — like LIMIT but guaranteed to be maker (no taker fees). Needs same as LIMIT.
+  IOC     — fills as much as possible at order_price, cancels the rest.
+  FOK     — fills entirely at order_price or cancels entirely.
+  ASK/BID — executes at the best ask/bid price.
+
+MARKET order examples:
+  Open LONG  0.005 ETH → symbol=PERP_ETH_USDC, order_type=MARKET, side=BUY,  order_quantity=0.005
+  Open SHORT 0.001 BTC → symbol=PERP_BTC_USDC, order_type=MARKET, side=SELL, order_quantity=0.001
+
+LIMIT order example:
+  Buy 0.01 ETH at $2000 → symbol=PERP_ETH_USDC, order_type=LIMIT, side=BUY, order_quantity=0.01, order_price=2000
+
+Closing positions:
+  To close a position, use the OPPOSITE side with reduce_only=true.
+  Close LONG  0.005 ETH → order_type=MARKET, side=SELL, order_quantity=0.005, reduce_only=true
+  Close SHORT 0.001 BTC → order_type=MARKET, side=BUY,  order_quantity=0.001, reduce_only=true
+  Use get_positions to see current position_qty. Absolute value of position_qty is the size to close.`),
 				mcp.WithString("symbol", mcp.Required(), mcp.Description("Trading pair symbol (e.g. PERP_BTC_USDC, PERP_ETH_USDC)")),
 				mcp.WithString("order_type", mcp.Required(), mcp.Description("Order type: LIMIT, MARKET, IOC, FOK, POST_ONLY, ASK, BID")),
 				mcp.WithString("side", mcp.Required(), mcp.Description("Order side: BUY or SELL")),
-				mcp.WithNumber("order_quantity", mcp.Description("Order size in base currency (e.g. 0.5 for 0.5 BTC). Required for LIMIT orders.")),
-				mcp.WithNumber("order_price", mcp.Description("Order price. Required for LIMIT/IOC/FOK/POST_ONLY orders.")),
-				mcp.WithNumber("order_amount", mcp.Description("Order size in quote currency (e.g. 1000 for $1000). For MARKET/ASK/BID orders.")),
+				mcp.WithNumber("order_quantity", mcp.Required(), mcp.Description("Order size in base currency (e.g. 0.005 for 0.005 ETH, 0.001 for 0.001 BTC)")),
+				mcp.WithNumber("order_price", mcp.Description("Order price. Required for LIMIT/IOC/FOK/POST_ONLY orders. Not needed for MARKET.")),
 				mcp.WithBoolean("reduce_only", mcp.Description("If true, the order can only reduce an existing position. Use this to close positions.")),
 			),
 			Handler: createOrder(svc),
@@ -122,20 +147,20 @@ func createOrder(svc *service.Service) server.ToolHandlerFunc {
 			return mcp.NewToolResultError(err.Error()), nil
 		}
 
-		orderReq := orderly.CreateOrderRequest{
-			Symbol:    symbol,
-			OrderType: orderType,
-			Side:      side,
+		qty := optNumber(req, "order_quantity", 0)
+		if qty == 0 {
+			return mcp.NewToolResultError("order_quantity is required and must be > 0"), nil
 		}
 
-		if v := optNumber(req, "order_quantity", 0); v != 0 {
-			orderReq.OrderQuantity = v
+		orderReq := orderly.CreateOrderRequest{
+			Symbol:        symbol,
+			OrderType:     orderType,
+			Side:          side,
+			OrderQuantity: qty,
 		}
+
 		if v := optNumber(req, "order_price", 0); v != 0 {
 			orderReq.OrderPrice = v
-		}
-		if v := optNumber(req, "order_amount", 0); v != 0 {
-			orderReq.OrderAmount = v
 		}
 		if req.GetBool("reduce_only", false) {
 			orderReq.ReduceOnly = true
@@ -143,12 +168,53 @@ func createOrder(svc *service.Service) server.ToolHandlerFunc {
 
 		result, err := svc.CreateOrder(ctx, orderReq)
 		if err != nil {
-			return mcp.NewToolResultError(fmt.Sprintf("create order failed: %v", err)), nil
+			return mcp.NewToolResultError(formatOrderError(err, orderReq)), nil
 		}
 
 		out, _ := json.Marshal(result)
 		return mcp.NewToolResultText(string(out)), nil
 	}
+}
+
+func formatOrderError(err error, req orderly.CreateOrderRequest) string {
+	apiErr, ok := orderly.IsAPIError(err)
+	if !ok {
+		return fmt.Sprintf("create order failed: %v", err)
+	}
+
+	base := fmt.Sprintf("Order rejected by Orderly (code %d): %s", apiErr.Code, apiErr.Message)
+
+	switch {
+	case contains(apiErr.Message, "not enough", "insufficient", "balance", "margin", "collateral", "free_collateral"):
+		return fmt.Sprintf("%s\n\nThe account does not have enough collateral to place this order. "+
+			"The user needs to deposit more funds first using prepare_orderly_deposit. "+
+			"Tell the user their balance is insufficient and ask if they want to deposit.", base)
+
+	case contains(apiErr.Message, "quantity too small", "min_notional", "minimum"):
+		return fmt.Sprintf("%s\n\nThe order_quantity is below the minimum allowed for %s. "+
+			"Try a larger order_quantity.", base, req.Symbol)
+
+	case contains(apiErr.Message, "price", "price_range", "price limit"):
+		return fmt.Sprintf("%s\n\nThe order_price is outside the allowed range for %s. "+
+			"Check current market price with get_markets and adjust.", base, req.Symbol)
+
+	case contains(apiErr.Message, "reduce_only", "reduce only"):
+		return fmt.Sprintf("%s\n\nThe reduce_only order failed — the position may already be closed "+
+			"or the order_quantity exceeds the current position size. Check with get_positions.", base)
+
+	default:
+		return base
+	}
+}
+
+func contains(s string, substrs ...string) bool {
+	lower := strings.ToLower(s)
+	for _, sub := range substrs {
+		if strings.Contains(lower, strings.ToLower(sub)) {
+			return true
+		}
+	}
+	return false
 }
 
 func cancelOrder(svc *service.Service) server.ToolHandlerFunc {
