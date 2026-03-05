@@ -25,6 +25,38 @@ func main() {
 		"perptools-mcp",
 		"1.0.0",
 		server.WithToolCapabilities(true),
+		server.WithInstructions(`You are connected to the Perptools/Orderly MCP server for Solana perpetual futures trading.
+
+AUTHENTICATION (required before trading):
+1. Get the user's Solana wallet address (via Phantom MCP or ask the user).
+2. Call prepare_registration with wallet_address → if already_registered=true, skip to step 4.
+3. Sign the returned message_base64 with the wallet (Phantom MCP sign_message) → call complete_registration with the signature.
+4. Call prepare_orderly_key with wallet_address.
+5. Sign the returned message_base64 with the wallet → call complete_orderly_key with the signature.
+6. Authentication is complete. All trading tools are now available.
+
+TRADING TOOLS (require authentication):
+- create_order  — place MARKET/LIMIT orders on PERP markets. Use order_quantity in base currency (ETH, BTC), NOT USDC.
+- cancel_order  — cancel an open order by order_id.
+- get_positions — view all open positions, collateral, margin info.
+
+MARKET DATA (no auth needed):
+- get_markets       — list available trading pairs with prices.
+- health            — check API status.
+- get_lending_vaults— view lending vaults with APY.
+
+DEPOSIT/WITHDRAW:
+- prepare_orderly_deposit  — build deposit transaction (sign with Phantom MCP, then submit).
+- prepare_orderly_withdraw — build withdrawal transaction.
+
+WORKFLOW EXAMPLE — Open a LONG ETH position:
+1. Authenticate (steps 1-6 above).
+2. Call get_markets to check current ETH price.
+3. Call get_positions to check available collateral.
+4. Call create_order with symbol=PERP_ETH_USDC, order_type=MARKET, side=BUY, order_quantity=0.005.
+5. Call get_positions to confirm the position was opened.
+
+To close a position: use create_order with the OPPOSITE side and reduce_only=true.`),
 	)
 
 	for _, t := range tools.RegisterAuthTools(svc) {
