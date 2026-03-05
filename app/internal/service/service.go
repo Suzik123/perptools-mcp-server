@@ -22,11 +22,12 @@ type Config struct {
 }
 
 type Service struct {
-	cfg       Config
-	auth      *auth.Service
-	orderly   orderly.Client
-	perptools perptools.Client
-	solanaRPC *rpc.Client
+	cfg            Config
+	auth           *auth.Service
+	orderly        orderly.Client
+	orderlyPrivate orderly.PrivateClient
+	perptools      perptools.Client
+	solanaRPC      *rpc.Client
 }
 
 func NewService(cfg Config) *Service {
@@ -47,16 +48,25 @@ func NewService(cfg Config) *Service {
 	return s
 }
 
-func (s *Service) rebuildPerptoolsClient() {
+func (s *Service) rebuildAuthenticatedClients() {
 	creds := s.auth.GetCredentials()
-	if creds != nil && creds.OrderlyPrivateKey != nil {
-		s.perptools = perptools.NewClientWithAuth(
-			s.cfg.PerptoolsBaseURL,
-			creds.AccountID,
-			creds.OrderlyPublicKey,
-			creds.OrderlyPrivateKey,
-		)
+	if creds == nil || creds.OrderlyPrivateKey == nil {
+		return
 	}
+
+	s.perptools = perptools.NewClientWithAuth(
+		s.cfg.PerptoolsBaseURL,
+		creds.AccountID,
+		creds.OrderlyPublicKey,
+		creds.OrderlyPrivateKey,
+	)
+
+	s.orderlyPrivate = orderly.NewPrivateClient(
+		s.cfg.OrderlyBaseURL,
+		creds.AccountID,
+		creds.OrderlyPublicKey,
+		creds.OrderlyPrivateKey,
+	)
 }
 
 // --- Auth ---
@@ -87,7 +97,7 @@ func (s *Service) CompleteOrderlyKey(ctx context.Context, walletAddress, signatu
 	if err := s.auth.CompleteOrderlyKey(ctx, walletAddress, signature); err != nil {
 		return err
 	}
-	s.rebuildPerptoolsClient()
+	s.rebuildAuthenticatedClients()
 	return nil
 }
 
@@ -133,6 +143,29 @@ func (s *Service) LendingWithdraw(ctx context.Context, req perptools.LendingTxRe
 		return nil, err
 	}
 	return s.perptools.LendingWithdraw(ctx, req)
+}
+
+// --- Orderly Trading (orders, positions) ---
+
+func (s *Service) CreateOrder(ctx context.Context, req orderly.CreateOrderRequest) (*orderly.CreateOrderResponse, error) {
+	if err := s.requireAuth(); err != nil {
+		return nil, err
+	}
+	return s.orderlyPrivate.CreateOrder(ctx, req)
+}
+
+func (s *Service) CancelOrder(ctx context.Context, symbol string, orderID int) (*orderly.CancelOrderResponse, error) {
+	if err := s.requireAuth(); err != nil {
+		return nil, err
+	}
+	return s.orderlyPrivate.CancelOrder(ctx, symbol, orderID)
+}
+
+func (s *Service) GetPositions(ctx context.Context) (*orderly.PositionsResponse, error) {
+	if err := s.requireAuth(); err != nil {
+		return nil, err
+	}
+	return s.orderlyPrivate.GetPositions(ctx)
 }
 
 // --- Orderly Vault (deposit / withdraw) ---

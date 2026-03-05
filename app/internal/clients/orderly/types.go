@@ -90,6 +90,85 @@ type GetAccountResponse struct {
 }
 
 // ---------------------------------------------------------------------------
+// Create Order — POST /v1/order
+// https://orderly.network/docs/build-on-omnichain/evm-api/restful-api/private/create-order
+// ---------------------------------------------------------------------------
+
+type CreateOrderRequest struct {
+	Symbol          string  `json:"symbol"`
+	ClientOrderID   string  `json:"client_order_id,omitempty"`
+	OrderType       string  `json:"order_type"`
+	OrderPrice      float64 `json:"order_price,omitempty"`
+	OrderQuantity   float64 `json:"order_quantity,omitempty"`
+	OrderAmount     float64 `json:"order_amount,omitempty"`
+	VisibleQuantity float64 `json:"visible_quantity,omitempty"`
+	Side            string  `json:"side"`
+	ReduceOnly      bool    `json:"reduce_only,omitempty"`
+}
+
+type CreateOrderResponse struct {
+	Success   bool   `json:"success"`
+	Timestamp int64  `json:"timestamp"`
+	Message   string `json:"message,omitempty"`
+	Data      struct {
+		OrderID       int     `json:"order_id"`
+		ClientOrderID string  `json:"client_order_id"`
+		OrderType     string  `json:"order_type"`
+		OrderPrice    float64 `json:"order_price"`
+		OrderQuantity float64 `json:"order_quantity"`
+		ErrorMessage  string  `json:"error_message"`
+	} `json:"data"`
+}
+
+// ---------------------------------------------------------------------------
+// Cancel Order — DELETE /v1/order
+// https://orderly.network/docs/build-on-omnichain/evm-api/restful-api/private/cancel-order
+// ---------------------------------------------------------------------------
+
+type CancelOrderResponse struct {
+	Success   bool   `json:"success"`
+	Timestamp int64  `json:"timestamp"`
+	Message   string `json:"message,omitempty"`
+	Data      struct {
+		Status string `json:"status"`
+	} `json:"data"`
+}
+
+// ---------------------------------------------------------------------------
+// Get All Positions — GET /v1/positions
+// https://orderly.network/docs/build-on-omnichain/evm-api/restful-api/private/get-all-positions-info
+// ---------------------------------------------------------------------------
+
+type PositionsResponse struct {
+	Success   bool   `json:"success"`
+	Timestamp int64  `json:"timestamp"`
+	Message   string `json:"message,omitempty"`
+	Data      struct {
+		MarginRatio         float64    `json:"current_margin_ratio_with_orders"`
+		FreeCollateral      float64    `json:"free_collateral"`
+		TotalCollateralVal  float64    `json:"total_collateral_value"`
+		TotalPnl24H         float64    `json:"total_pnl_24_h"`
+		MaintenanceMargin   float64    `json:"maintenance_margin_ratio"`
+		InitialMargin       float64    `json:"initial_margin_ratio"`
+		OpenMarginRatio     float64    `json:"open_margin_ratio"`
+		Rows                []Position `json:"rows"`
+	} `json:"data"`
+}
+
+type Position struct {
+	Symbol           string  `json:"symbol"`
+	PositionQty      float64 `json:"position_qty"`
+	AverageOpenPrice float64 `json:"average_open_price"`
+	MarkPrice        float64 `json:"mark_price"`
+	UnsettledPnl     float64 `json:"unsettled_pnl"`
+	EstLiqPrice      float64 `json:"est_liq_price"`
+	IMR              float64 `json:"imr"`
+	MMR              float64 `json:"mmr"`
+	Leverage         float64 `json:"leverage"`
+	Timestamp        int64   `json:"timestamp"`
+}
+
+// ---------------------------------------------------------------------------
 // Withdraw Message — used to build a keccak256 hash for wallet signing
 // ---------------------------------------------------------------------------
 
