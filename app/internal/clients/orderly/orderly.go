@@ -130,6 +130,9 @@ type PrivateClient interface {
 	CreateOrder(ctx context.Context, req CreateOrderRequest) (*CreateOrderResponse, error)
 	CancelOrder(ctx context.Context, symbol string, orderID int) (*CancelOrderResponse, error)
 	GetPositions(ctx context.Context) (*PositionsResponse, error)
+	PlaceAlgoOrder(ctx context.Context, req PlaceAlgoOrderRequest) (*PlaceAlgoOrderResponse, error)
+	CancelAlgoOrder(ctx context.Context, symbol string, algoOrderID int) error
+	GetAlgoOrders(ctx context.Context, symbol string) (*GetAlgoOrdersResponse, error)
 }
 
 type privateClient struct {
@@ -240,6 +243,54 @@ func (c *privateClient) GetPositions(ctx context.Context) (*PositionsResponse, e
 	}
 	if !out.Success {
 		return nil, fmt.Errorf("get positions: %s", out.Message)
+	}
+	return &out, nil
+}
+
+func (c *privateClient) PlaceAlgoOrder(ctx context.Context, req PlaceAlgoOrderRequest) (*PlaceAlgoOrderResponse, error) {
+	var out PlaceAlgoOrderResponse
+	r, err := c.http.R().SetContext(ctx).
+		SetBody(req).
+		SetResult(&out).
+		Post("/v1/algo/order")
+	if err != nil {
+		return nil, fmt.Errorf("place algo order: %w", err)
+	}
+	if r.IsError() || !out.Success {
+		return nil, parseAPIError(r.Body(), "place algo order")
+	}
+	return &out, nil
+}
+
+func (c *privateClient) CancelAlgoOrder(ctx context.Context, symbol string, algoOrderID int) error {
+	r, err := c.http.R().SetContext(ctx).
+		SetQueryParam("symbol", symbol).
+		SetQueryParam("algo_order_id", strconv.Itoa(algoOrderID)).
+		Delete("/v1/algo/order")
+	if err != nil {
+		return fmt.Errorf("cancel algo order: %w", err)
+	}
+	if r.IsError() {
+		return fmt.Errorf("cancel algo order: %s %s", r.Status(), r.String())
+	}
+	return nil
+}
+
+func (c *privateClient) GetAlgoOrders(ctx context.Context, symbol string) (*GetAlgoOrdersResponse, error) {
+	var out GetAlgoOrdersResponse
+	req := c.http.R().SetContext(ctx).SetResult(&out)
+	if symbol != "" {
+		req = req.SetQueryParam("symbol", symbol)
+	}
+	r, err := req.Get("/v1/algo/orders")
+	if err != nil {
+		return nil, fmt.Errorf("get algo orders: %w", err)
+	}
+	if r.IsError() {
+		return nil, fmt.Errorf("get algo orders: %s %s", r.Status(), r.String())
+	}
+	if !out.Success {
+		return nil, fmt.Errorf("get algo orders: %s", out.Message)
 	}
 	return &out, nil
 }

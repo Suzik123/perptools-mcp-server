@@ -36,14 +36,16 @@ AUTHENTICATION (required before trading):
 6. Authentication is complete. All trading tools are now available.
 
 TRADING TOOLS (require authentication):
-- create_order  — place MARKET/LIMIT orders on PERP markets. Use order_quantity in base currency (ETH, BTC), NOT USDC.
-- cancel_order  — cancel an open order by order_id.
-- get_positions — view all open positions, collateral, margin info.
+- create_order        — place MARKET/LIMIT orders on PERP markets. Use order_quantity in base currency (ETH, BTC), NOT USDC.
+- cancel_order       — cancel an open order by order_id.
+- get_positions      — view all open positions, collateral, margin info.
+- set_position_tp_sl  — set take-profit and stop-loss on existing position (one TP/SL order per symbol).
+- get_algo_orders    — list TP/SL and other algo orders. Optional symbol filter.
+- cancel_algo_order  — cancel TP/SL by algo_order_id.
 
 MARKET DATA (no auth needed):
 - get_markets       — list available trading pairs with prices.
 - health            — check API status.
-- get_lending_vaults— view lending vaults with APY.
 
 DEPOSIT/WITHDRAW:
 - prepare_orderly_deposit  — build deposit transaction (sign with Phantom MCP, then submit).
@@ -55,6 +57,7 @@ WORKFLOW EXAMPLE — Open a LONG ETH position:
 3. Call get_positions to check available collateral.
 4. Call create_order with symbol=PERP_ETH_USDC, order_type=MARKET, side=BUY, order_quantity=0.005.
 5. Call get_positions to confirm the position was opened.
+6. Optionally: set_position_tp_sl with take_profit_price and stop_loss_price to protect the position.
 
 To close a position: use create_order with the OPPOSITE side and reduce_only=true.`),
 	)

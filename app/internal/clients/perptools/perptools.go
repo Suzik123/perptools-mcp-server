@@ -19,7 +19,6 @@ type Client interface {
 	Version(ctx context.Context) (*VersionResponse, error)
 	GetMarket(ctx context.Context, addresses string) ([]MarketResponse, error)
 	GetMarkets(ctx context.Context, limit, offset int32) (*MarketsResponse, error)
-	GetLendingVaults(ctx context.Context) ([]Vault, error)
 
 	// Session-based (no orderly signature required)
 	Session(ctx context.Context, publicKey string) error
@@ -56,9 +55,6 @@ type Client interface {
 	GetSnagUser(ctx context.Context, publicKey string) (*SnagUser, error)
 
 	GetMysteryTasks(ctx context.Context, publicKey string) ([]MysteryTask, error)
-
-	LendingDeposit(ctx context.Context, req LendingTxRequest) (*Transaction, error)
-	LendingWithdraw(ctx context.Context, req LendingTxRequest) (*Transaction, error)
 
 	// V2
 	GetAchievementsV2(ctx context.Context, publicKey string) ([]Achievement, error)
@@ -203,15 +199,6 @@ func (c *client) GetMarkets(ctx context.Context, limit, offset int32) (*MarketsR
 		return nil, e
 	}
 	return &out, nil
-}
-
-func (c *client) GetLendingVaults(ctx context.Context) ([]Vault, error) {
-	var out []Vault
-	r, err := c.pubHTTP.R().SetContext(ctx).SetResult(&out).Get("/v1/lending/vault")
-	if e := checkErr(r, err, "get lending vaults"); e != nil {
-		return nil, e
-	}
-	return out, nil
 }
 
 // ---------------------------------------------------------------------------
@@ -488,30 +475,6 @@ func (c *client) GetMysteryTasks(ctx context.Context, publicKey string) ([]Myste
 		return nil, e
 	}
 	return out, nil
-}
-
-func (c *client) LendingDeposit(ctx context.Context, req LendingTxRequest) (*Transaction, error) {
-	var out Transaction
-	r, err := c.authedHTTP.R().SetContext(ctx).
-		SetBody(req).
-		SetResult(&out).
-		Post("/v1/lending/deposit")
-	if e := checkErr(r, err, "lending deposit"); e != nil {
-		return nil, e
-	}
-	return &out, nil
-}
-
-func (c *client) LendingWithdraw(ctx context.Context, req LendingTxRequest) (*Transaction, error) {
-	var out Transaction
-	r, err := c.authedHTTP.R().SetContext(ctx).
-		SetBody(req).
-		SetResult(&out).
-		Post("/v1/lending/withdraw")
-	if e := checkErr(r, err, "lending withdraw"); e != nil {
-		return nil, e
-	}
-	return &out, nil
 }
 
 // ---------------------------------------------------------------------------

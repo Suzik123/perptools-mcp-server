@@ -190,6 +190,67 @@ type Position struct {
 }
 
 // ---------------------------------------------------------------------------
+// Place Algo Order — POST /v1/algo/order
+// https://orderly.network/docs/build-on-omnichain/user-flows/algo-order-samples
+// ---------------------------------------------------------------------------
+
+// PlaceAlgoOrderRequest is the body for POSITIONAL_TP_SL (take-profit / stop-loss on position).
+// POSITIONAL_TP_SL: max 1 per user, closes full position when triggered.
+type PlaceAlgoOrderRequest struct {
+	Symbol            string             `json:"symbol"`
+	AlgoType          string             `json:"algo_type"` // "POSITIONAL_TP_SL"
+	TriggerPriceType  string             `json:"trigger_price_type"`
+	ChildOrders       []AlgoChildOrder   `json:"child_orders"`
+}
+
+type AlgoChildOrder struct {
+	Symbol            string  `json:"symbol"`
+	AlgoType          string  `json:"algo_type"` // "TAKE_PROFIT" or "STOP_LOSS"
+	Side              string  `json:"side"`
+	OrderType         string  `json:"type"` // "CLOSE_POSITION" for POSITIONAL_TP_SL
+	TriggerPriceType  string  `json:"trigger_price_type"`
+	TriggerPrice      float64 `json:"trigger_price"`
+	ReduceOnly        bool    `json:"reduce_only"`
+}
+
+type PlaceAlgoOrderResponse struct {
+	Success   bool   `json:"success"`
+	Timestamp int64  `json:"timestamp"`
+	Message   string `json:"message,omitempty"`
+	Data      struct {
+		AlgoOrderID int `json:"algo_order_id"`
+	} `json:"data"`
+}
+
+// ---------------------------------------------------------------------------
+// Cancel Algo Order — DELETE /v1/algo/order
+// ---------------------------------------------------------------------------
+
+// GetAlgoOrdersResponse — GET /v1/algo/orders
+type GetAlgoOrdersResponse struct {
+	Success   bool   `json:"success"`
+	Timestamp int64 `json:"timestamp"`
+	Message   string `json:"message,omitempty"`
+	Data      struct {
+		Rows []AlgoOrderRow `json:"rows"`
+	} `json:"data"`
+}
+
+type AlgoOrderRow struct {
+	AlgoOrderID      int             `json:"algo_order_id"`
+	AlgoType         string          `json:"algo_type"`
+	Symbol           string          `json:"symbol"`
+	Side             string          `json:"side"`
+	Quantity         float64         `json:"quantity"`
+	TriggerPrice     float64         `json:"trigger_price"`
+	TriggerPriceType string          `json:"trigger_price_type"`
+	IsTriggered      bool            `json:"is_triggered"`
+	IsActivated      bool            `json:"is_activated"`
+	AlgoStatus       string          `json:"algo_status"`
+	ChildOrders      []AlgoOrderRow   `json:"child_orders,omitempty"`
+}
+
+// ---------------------------------------------------------------------------
 // Withdraw Message — used to build a keccak256 hash for wallet signing
 // ---------------------------------------------------------------------------
 

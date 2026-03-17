@@ -30,14 +30,6 @@ type MarketItem struct {
 	Url    *string `json:"url,omitempty"`
 }
 
-type Vault struct {
-	Mint     string          `json:"mint"`
-	Symbol   string          `json:"symbol"`
-	TVL      decimal.Decimal `json:"tvl"`
-	APY      decimal.Decimal `json:"apy"`
-	Decimals int             `json:"decimals"`
-}
-
 type WhitelistResponse struct {
 	IsWhitelisted bool       `json:"is_whitelisted"`
 	ActiveAfter   *time.Time `json:"active_after,omitempty"`
@@ -114,14 +106,6 @@ type CompleteRuleRequest struct {
 	PublicKey        string  `json:"public_key"`
 	VerificationCode *string `json:"verification_code,omitempty"`
 	ContentUrl       string  `json:"content_url,omitempty"`
-}
-
-type LendingTxRequest struct {
-	PublicKey    string `json:"public_key"`
-	TokenMint    string `json:"token_mint"`
-	Amount       uint64 `json:"amount"`
-	ComputeLimit *uint64 `json:"limit,omitempty"`
-	ComputePrice *uint64 `json:"price,omitempty"`
 }
 
 // Response types
@@ -236,6 +220,3 @@ type MysteryTask struct {
 	Status string          `json:"status"`
 }
 
-type Transaction struct {
-	TxbBase64 string `json:"txb_base64"`
-}

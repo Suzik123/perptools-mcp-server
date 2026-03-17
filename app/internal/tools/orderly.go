@@ -104,6 +104,36 @@ To close a position, use create_order with the opposite side and reduce_only=tru
 			),
 			Handler: getPositions(svc),
 		},
+		{
+			Tool: mcp.NewTool("set_position_tp_sl",
+				mcp.WithDescription(`Set take-profit and stop-loss on an existing position. Requires authentication.
+Uses POSITIONAL_TP_SL: max 1 per user per symbol. Closes the full position when triggered.
+
+LONG position: take_profit_price > entry price (profit when price rises), stop_loss_price < entry (limit loss when price falls).
+SHORT position: take_profit_price < entry price, stop_loss_price > entry.
+
+Call get_positions first to see current positions and entry prices. Only one active TP/SL order per symbol — use cancel_algo_order first if replacing.`),
+				mcp.WithString("symbol", mcp.Required(), mcp.Description("Trading pair (e.g. PERP_ETH_USDC)")),
+				mcp.WithNumber("take_profit_price", mcp.Required(), mcp.Description("Price at which to take profit (closes position)")),
+				mcp.WithNumber("stop_loss_price", mcp.Required(), mcp.Description("Price at which to stop loss (closes position)")),
+			),
+			Handler: setPositionTPSL(svc),
+		},
+		{
+			Tool: mcp.NewTool("get_algo_orders",
+				mcp.WithDescription("List algo orders (TP/SL, etc.). Requires authentication. Pass symbol to filter by trading pair."),
+				mcp.WithString("symbol", mcp.Description("Filter by symbol (e.g. PERP_ETH_USDC). Optional — omit to list all.")),
+			),
+			Handler: getAlgoOrders(svc),
+		},
+		{
+			Tool: mcp.NewTool("cancel_algo_order",
+				mcp.WithDescription("Cancel an algo order (e.g. TP/SL) by algo_order_id. Requires authentication. Use get_algo_orders to find the ID."),
+				mcp.WithString("symbol", mcp.Required(), mcp.Description("Trading pair (e.g. PERP_ETH_USDC)")),
+				mcp.WithNumber("algo_order_id", mcp.Required(), mcp.Description("The algo_order_id from get_algo_orders")),
+			),
+			Handler: cancelAlgoOrder(svc),
+		},
 	}
 }
 
@@ -247,6 +277,67 @@ func getPositions(svc *service.Service) server.ToolHandlerFunc {
 
 		out, _ := json.MarshalIndent(result, "", "  ")
 		return mcp.NewToolResultText(string(out)), nil
+	}
+}
+
+func setPositionTPSL(svc *service.Service) server.ToolHandlerFunc {
+	return func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		symbol, err := req.RequireString("symbol")
+		if err != nil {
+			return mcp.NewToolResultError(err.Error()), nil
+		}
+		tpPrice := optNumber(req, "take_profit_price", 0)
+		slPrice := optNumber(req, "stop_loss_price", 0)
+		if tpPrice == 0 || slPrice == 0 {
+			return mcp.NewToolResultError("take_profit_price and stop_loss_price are required and must be > 0"), nil
+		}
+
+		result, err := svc.SetPositionTPSL(ctx, symbol, tpPrice, slPrice)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("set position TP/SL failed: %v", err)), nil
+		}
+
+		out, _ := json.Marshal(map[string]any{
+			"algo_order_id":   result.Data.AlgoOrderID,
+			"symbol":          symbol,
+			"take_profit":     tpPrice,
+			"stop_loss":       slPrice,
+			"message":         "TP/SL order placed. Use get_algo_orders to check status.",
+		})
+		return mcp.NewToolResultText(string(out)), nil
+	}
+}
+
+func getAlgoOrders(svc *service.Service) server.ToolHandlerFunc {
+	return func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		symbol := optString(req, "symbol")
+
+		result, err := svc.GetAlgoOrders(ctx, symbol)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("get algo orders failed: %v", err)), nil
+		}
+
+		out, _ := json.MarshalIndent(result, "", "  ")
+		return mcp.NewToolResultText(string(out)), nil
+	}
+}
+
+func cancelAlgoOrder(svc *service.Service) server.ToolHandlerFunc {
+	return func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		symbol, err := req.RequireString("symbol")
+		if err != nil {
+			return mcp.NewToolResultError(err.Error()), nil
+		}
+		algoOrderID, err := req.RequireInt("algo_order_id")
+		if err != nil {
+			return mcp.NewToolResultError(err.Error()), nil
+		}
+
+		if err := svc.CancelAlgoOrder(ctx, symbol, algoOrderID); err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("cancel algo order failed: %v", err)), nil
+		}
+
+		return mcp.NewToolResultText("Algo order cancelled successfully."), nil
 	}
 }
 

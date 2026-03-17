@@ -111,10 +111,6 @@ func (s *Service) GetMarkets(ctx context.Context, limit, offset int32) (*perptoo
 	return s.perptools.GetMarkets(ctx, limit, offset)
 }
 
-func (s *Service) GetLendingVaults(ctx context.Context) ([]perptools.Vault, error) {
-	return s.perptools.GetLendingVaults(ctx)
-}
-
 // --- Perptools (authenticated) ---
 
 func (s *Service) GetUserPoints(ctx context.Context, publicKey string) (*perptools.UserPoints, error) {
@@ -129,20 +125,6 @@ func (s *Service) GetLeaderboard(ctx context.Context, publicKey string, limit, o
 		return nil, err
 	}
 	return s.perptools.GetLeaderboard(ctx, publicKey, limit, offset)
-}
-
-func (s *Service) LendingDeposit(ctx context.Context, req perptools.LendingTxRequest) (*perptools.Transaction, error) {
-	if err := s.requireAuth(); err != nil {
-		return nil, err
-	}
-	return s.perptools.LendingDeposit(ctx, req)
-}
-
-func (s *Service) LendingWithdraw(ctx context.Context, req perptools.LendingTxRequest) (*perptools.Transaction, error) {
-	if err := s.requireAuth(); err != nil {
-		return nil, err
-	}
-	return s.perptools.LendingWithdraw(ctx, req)
 }
 
 // --- Orderly Trading (orders, positions) ---
@@ -166,6 +148,54 @@ func (s *Service) GetPositions(ctx context.Context) (*orderly.PositionsResponse,
 		return nil, err
 	}
 	return s.orderlyPrivate.GetPositions(ctx)
+}
+
+func (s *Service) SetPositionTPSL(ctx context.Context, symbol string, takeProfitPrice, stopLossPrice float64) (*orderly.PlaceAlgoOrderResponse, error) {
+	if err := s.requireAuth(); err != nil {
+		return nil, err
+	}
+	positions, err := s.orderlyPrivate.GetPositions(ctx)
+	if err != nil {
+		return nil, err
+	}
+	var pos *orderly.Position
+	for i := range positions.Data.Rows {
+		if positions.Data.Rows[i].Symbol == symbol {
+			pos = &positions.Data.Rows[i]
+			break
+		}
+	}
+	if pos == nil || pos.PositionQty == 0 {
+		return nil, fmt.Errorf("no open position for %s — open a position first before setting TP/SL", symbol)
+	}
+	side := "SELL"
+	if pos.PositionQty < 0 {
+		side = "BUY"
+	}
+	req := orderly.PlaceAlgoOrderRequest{
+		Symbol:           symbol,
+		AlgoType:         "POSITIONAL_TP_SL",
+		TriggerPriceType: "MARK_PRICE",
+		ChildOrders: []orderly.AlgoChildOrder{
+			{Symbol: symbol, AlgoType: "TAKE_PROFIT", Side: side, OrderType: "CLOSE_POSITION", TriggerPriceType: "MARK_PRICE", TriggerPrice: takeProfitPrice, ReduceOnly: true},
+			{Symbol: symbol, AlgoType: "STOP_LOSS", Side: side, OrderType: "CLOSE_POSITION", TriggerPriceType: "MARK_PRICE", TriggerPrice: stopLossPrice, ReduceOnly: true},
+		},
+	}
+	return s.orderlyPrivate.PlaceAlgoOrder(ctx, req)
+}
+
+func (s *Service) CancelAlgoOrder(ctx context.Context, symbol string, algoOrderID int) error {
+	if err := s.requireAuth(); err != nil {
+		return err
+	}
+	return s.orderlyPrivate.CancelAlgoOrder(ctx, symbol, algoOrderID)
+}
+
+func (s *Service) GetAlgoOrders(ctx context.Context, symbol string) (*orderly.GetAlgoOrdersResponse, error) {
+	if err := s.requireAuth(); err != nil {
+		return nil, err
+	}
+	return s.orderlyPrivate.GetAlgoOrders(ctx, symbol)
 }
 
 // --- Orderly Vault (deposit / withdraw) ---
