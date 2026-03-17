@@ -26,11 +26,10 @@ func RegisterOrderlyTools(svc *service.Service) []ToolDef {
 		},
 		{
 			Tool: mcp.NewTool("prepare_orderly_withdraw",
-				mcp.WithDescription("Build an unsigned Solana memo transaction with the Orderly withdraw message. Returns base64-encoded transaction for wallet signing. After signing, the signature is used to call the Orderly withdrawal API."),
+				mcp.WithDescription("Build an unsigned Solana memo transaction for withdrawal. Fetches withdraw nonce automatically. Returns base64-encoded transaction for wallet signing."),
 				mcp.WithString("wallet_address", mcp.Required(), mcp.Description("Solana wallet public key (base58)")),
 				mcp.WithString("token", mcp.Required(), mcp.Description("Token symbol: USDC, USDT, or SOL")),
-				mcp.WithNumber("amount", mcp.Required(), mcp.Description("Amount in smallest token units")),
-				mcp.WithNumber("withdraw_nonce", mcp.Required(), mcp.Description("Withdraw nonce from Orderly")),
+				mcp.WithNumber("amount", mcp.Required(), mcp.Description("Amount in smallest token units (e.g. 1500000 for 1.5 USDC)")),
 			),
 			Handler: prepareOrderlyWithdraw(svc),
 		},
@@ -355,9 +354,8 @@ func prepareOrderlyWithdraw(svc *service.Service) server.ToolHandlerFunc {
 		if amount == 0 {
 			return mcp.NewToolResultError("amount is required and must be > 0"), nil
 		}
-		withdrawNonce := uint64(optNumber(req, "withdraw_nonce", 0))
 
-		result, err := svc.PrepareOrderlyWithdraw(ctx, wallet, token, amount, withdrawNonce)
+		result, err := svc.PrepareOrderlyWithdraw(ctx, wallet, token, amount)
 		if err != nil {
 			return mcp.NewToolResultError(fmt.Sprintf("prepare withdraw failed: %v", err)), nil
 		}

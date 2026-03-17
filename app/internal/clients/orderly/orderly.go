@@ -130,6 +130,7 @@ type PrivateClient interface {
 	CreateOrder(ctx context.Context, req CreateOrderRequest) (*CreateOrderResponse, error)
 	CancelOrder(ctx context.Context, symbol string, orderID int) (*CancelOrderResponse, error)
 	GetPositions(ctx context.Context) (*PositionsResponse, error)
+	GetSettleNonce(ctx context.Context) (*SettleNonceResponse, error)
 	PlaceAlgoOrder(ctx context.Context, req PlaceAlgoOrderRequest) (*PlaceAlgoOrderResponse, error)
 	CancelAlgoOrder(ctx context.Context, symbol string, algoOrderID int) error
 	GetAlgoOrders(ctx context.Context, symbol string) (*GetAlgoOrdersResponse, error)
@@ -243,6 +244,23 @@ func (c *privateClient) GetPositions(ctx context.Context) (*PositionsResponse, e
 	}
 	if !out.Success {
 		return nil, fmt.Errorf("get positions: %s", out.Message)
+	}
+	return &out, nil
+}
+
+func (c *privateClient) GetSettleNonce(ctx context.Context) (*SettleNonceResponse, error) {
+	var out SettleNonceResponse
+	r, err := c.http.R().SetContext(ctx).
+		SetResult(&out).
+		Get("/v1/settle_nonce")
+	if err != nil {
+		return nil, fmt.Errorf("get settle nonce: %w", err)
+	}
+	if r.IsError() {
+		return nil, fmt.Errorf("get settle nonce: %s %s", r.Status(), r.String())
+	}
+	if !out.Success {
+		return nil, fmt.Errorf("get settle nonce: %s", out.Message)
 	}
 	return &out, nil
 }

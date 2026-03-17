@@ -135,6 +135,26 @@ func TestAuthAndDeposit(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
+// TestWithdraw — auth + prepare 1.5 USDC withdraw
+// ---------------------------------------------------------------------------
+
+func TestWithdraw(t *testing.T) {
+	env := setupAndAuth(t)
+
+	t.Log("withdraw — prepare_orderly_withdraw (1.5 USDC)")
+	withdrawResp := callTool(t, env.ctx, env.toolMap, "prepare_orderly_withdraw", map[string]any{
+		"wallet_address": env.walletAddress,
+		"token":          "USDC",
+		"amount":         float64(1_500_000),
+	})
+
+	var withdrawData map[string]any
+	mustUnmarshal(t, withdrawResp, &withdrawData)
+	t.Logf("  transaction ready for Phantom sign_transaction (len=%d bytes)",
+		len(withdrawData["transaction_base64"].(string)))
+}
+
+// ---------------------------------------------------------------------------
 // TestOpenETHLong — auth + MARKET BUY PERP_ETH_USDC for 11 USDC
 // ---------------------------------------------------------------------------
 

@@ -36,7 +36,7 @@ Trading, positions, deposit/withdraw. Most require auth (except deposit/withdraw
 | Tool | Auth | Purpose |
 |------|------|---------|
 | `prepare_orderly_deposit` | No | Build unsigned Solana tx for deposit |
-| `prepare_orderly_withdraw` | No | Build unsigned withdraw tx |
+| `prepare_orderly_withdraw` | **Yes** | Build unsigned withdraw tx (fetches nonce automatically) |
 | `create_order` | **Yes** | Place MARKET/LIMIT orders |
 | `cancel_order` | **Yes** | Cancel by order_id |
 | `get_positions` | **Yes** | Positions, collateral, margin |

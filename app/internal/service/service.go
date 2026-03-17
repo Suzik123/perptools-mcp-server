@@ -150,6 +150,13 @@ func (s *Service) GetPositions(ctx context.Context) (*orderly.PositionsResponse,
 	return s.orderlyPrivate.GetPositions(ctx)
 }
 
+func (s *Service) GetSettleNonce(ctx context.Context) (*orderly.SettleNonceResponse, error) {
+	if err := s.requireAuth(); err != nil {
+		return nil, err
+	}
+	return s.orderlyPrivate.GetSettleNonce(ctx)
+}
+
 func (s *Service) SetPositionTPSL(ctx context.Context, symbol string, takeProfitPrice, stopLossPrice float64) (*orderly.PlaceAlgoOrderResponse, error) {
 	if err := s.requireAuth(); err != nil {
 		return nil, err
@@ -261,11 +268,17 @@ func (s *Service) PrepareOrderlyDeposit(ctx context.Context, walletAddress, symb
 	}, nil
 }
 
-func (s *Service) PrepareOrderlyWithdraw(ctx context.Context, walletAddress, token string, amount, withdrawNonce uint64) (*WithdrawResult, error) {
+func (s *Service) PrepareOrderlyWithdraw(ctx context.Context, walletAddress, token string, amount uint64) (*WithdrawResult, error) {
 	userKey, err := solana.PublicKeyFromBase58(walletAddress)
 	if err != nil {
 		return nil, fmt.Errorf("invalid wallet address: %w", err)
 	}
+
+	nonceResp, err := s.orderlyPrivate.GetSettleNonce(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("get withdraw nonce: %w", err)
+	}
+	withdrawNonce := nonceResp.Data.SettleNonce
 
 	withdrawMsg := orderly.WithdrawMessage{
 		BrokerID:      s.cfg.BrokerID,

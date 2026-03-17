@@ -223,6 +223,20 @@ type PlaceAlgoOrderResponse struct {
 }
 
 // ---------------------------------------------------------------------------
+// Get Settle Nonce — GET /v1/settle_nonce (used for withdraw nonce)
+// https://orderly.network/docs/build-on-omnichain/evm-api/restful-api/private/get-settle-pnl-nonce
+// ---------------------------------------------------------------------------
+
+type SettleNonceResponse struct {
+	Success   bool   `json:"success"`
+	Timestamp int64  `json:"timestamp"`
+	Message   string `json:"message,omitempty"`
+	Data      struct {
+		SettleNonce uint64 `json:"settle_nonce"`
+	} `json:"data"`
+}
+
+// ---------------------------------------------------------------------------
 // Cancel Algo Order — DELETE /v1/algo/order
 // ---------------------------------------------------------------------------
 
